@@ -5,20 +5,22 @@
 #include <string.h>
 #include <string>
 #include <stdio.h>
-
 #include <hiredis/hiredis.h>
+#include "utility.h"
+
+int to_number(std::string str);
 
 class Redis{
 public:
 	Redis() {}
 	~Redis() {
-		this->_connect = nullptr;
-		this->_reply = nullptr;
+		this->_connect = NULL;
+		this->_reply = NULL;
 	}
 
 	bool connect(std::string host, int port) {
 		this->_connect = redisConnect(host.c_str(), port);
-		if (this->_connect != nullptr && this->_connect->err) {
+		if (this->_connect != NULL && this->_connect->err) {
 			printf("connect error: %s\n", this->_connect->errstr);
 			return 0;
 		}
@@ -26,7 +28,7 @@ public:
 	}
 
 	std::string get(std::string key) {
-		this->_reply = (redisReply*) redisConnect(this->_connect, "GET %s" ,key.c_str());
+		this->_reply = (redisReply*) redisCommand(this->_connect, "GET %s" ,key.c_str());
 		std::string str = this->_reply->str;
 		freeReplyObject(this->_reply);
 		return str;
@@ -64,7 +66,7 @@ public:
 		freeReplyObject(this->_reply);
 		return ret;
 	}
-	
+
 	std::string spop(std::string name)
 	{
 		this->_reply = (redisReply*) redisCommand(this->_connect, "SPOP %s", name.c_str());
@@ -73,12 +75,19 @@ public:
 		return ret;
 	}
 
-	std::string hget(std::string htname, std::string key)
+	int spopi(std::string name) {
+		this->_reply = (redisReply*) redisCommand(this->_connect, "SPOP %s", name.c_str());
+		std::string temp = this->_reply->str;
+		freeReplyObject(this->_reply);
+		return to_number(temp);
+	}
+
+	int hget(std::string htname, std::string key)
 	{
 		this->_reply = (redisReply*)redisCommand(this->_connect, "HGET %s %s", htname.c_str(), key.c_str());
 		std::string str = this->_reply->str;
 		freeReplyObject(this->_reply);
-		return str;
+		return to_number(str);
 	}
 
 	void set(std::string key, std::string value) {
@@ -91,7 +100,7 @@ public:
 	}
 
 private:
-	redisConnect* _connect;
+	redisContext* _connect;
 	redisReply* _reply;
 };
 

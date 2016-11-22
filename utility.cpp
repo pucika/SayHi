@@ -1,15 +1,9 @@
 #include "utility.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <apra/inet.h>
-#include <sys/epoll.h>
 
-extern struct epoll_event events[EPOLLEVENTS];
+
+#define IP "127.0.0.1"
+
+Redis* redis = new Redis();
 
 int socket_bind(const char* ip, int port) {
 	int listenfd;
@@ -65,15 +59,36 @@ void handle_accept(int epollfd, int listenfd){
 	int chifd;
 	struct sockaddr_in cliaddr;
 	socklen_t cliaddrlen;
-	child = accept(listenfd, (struct sockaddr_in*) &cliaddr, &cliaddrlen);
-	if (child == -1)
+	chifd = accept(listenfd, (struct sockaddr*) &cliaddr, &cliaddrlen);
+	if (chifd == -1)
 		perror("accept error");
 	else {
 		//判断ip是否在用户表单	
 		//TODO
-
+		//redis->sadd("user", "");
 		// 如果没有，添加ip至用户表单	以及匹配信息	：user(set)  mapping(ht)ip:fd
-		redis->set(); 		//TODO
+		if (redis->scard("user") == 0)	{
+			char buf[MAXSIZE];
+			memset(buf, 0, MAXSIZE);
+			const char* temp = "matching...";
+			strncpy(buf, temp, MAXSIZE);
+			write(chifd, buf, strlen(buf));
+			redis->sadd("user", std::to_string(chifd));
+		} else {
+			int candi = redis->spopi("user");
+			//printf("candi: %d", candi);
+			//printf("chifd: %d", chifd);
+			redis->hset("match", std::to_string(candi), std::to_string(chifd));
+			redis->hset("match", std::to_string(chifd), std::to_string(candi));
+			add_event(epollfd, chifd, EPOLLIN);
+			add_event(epollfd, candi, EPOLLIN);
+			char buf[MAXSIZE];
+			memset(buf, 0, MAXSIZE);
+			const char* temp = "match complete! you can send some words";
+			strncpy(buf, temp, MAXSIZE);
+			write(chifd, buf, strlen(buf));
+			write(candi, buf, strlen(buf));
+		}
 		//get random mapping 若没有，返回；有，匹配   match(ht): fd:fd
 
 	}
@@ -88,22 +103,31 @@ void do_read(int epollfd, int fd, char *buf) {
 		delete_event(epollfd, fd, EPOLLIN);
 	} else if (nread == 0) {
 		//关闭描述符
+		close(fd);
+
 	} else {
 		// got matched fd2
-		write(fd2, );
-		modify_event(epollfd, fd, EPOLLOUT);
+		int fd2 = redis->hget("match", std::to_string(fd));
+		write(fd2, buf, strlen(buf) + 1);
+		memset(buf, 0, MAXSIZE);
+		//do_write(epollfd, fd2, buf);
+		modify_event(epollfd, fd, EPOLLIN);
+		modify_event(epollfd, fd2, EPOLLIN);
 	}
 }
 
 void do_write(int epollfd, int fd, char* buf) {
 	int nwrite;
-	nwrite = write(fd, buf, strlen(buf));
+	nwrite = write(fd, buf, strlen(buf) + 1);
 	if (nwrite == -1) {
 		perror("write error: ");
 		close(fd);
 		delete_event(epollfd, fd, EPOLLOUT);
-	} else
+	} else{
+		//int fd2 = redis->hget("match", std::to_string(fd));
+		//write(fd2, buf, sizeof(buf));
 		modify_event(epollfd, fd, EPOLLIN);
+	}
 	memset(buf, 0, MAXSIZE);
 }
 
@@ -129,9 +153,18 @@ void delete_event(int epollfd, int fd, int state) {
 }
 
 void add_user(const char* ip) {	//ip vs port
-	redis->sadd(ip);
+	redis->sadd("user", ip);		//TODO设置过期时间
 }   
 
 void del_user(const char* ip) {
-	redis->srem(ip);
+	redis->srem("user", ip);
+}
+
+int to_number(std::string str)
+{
+	std::stringstream ss;
+	ss << str;
+	int ret ;
+	ss >> ret;
+	return ret;
 }

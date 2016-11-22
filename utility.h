@@ -1,14 +1,23 @@
 #ifndef _UTILITY_H_
 #define _UTILITY_H_
+#include <sys/epoll.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sstream>
+#include <string>
 #include "redis.h"
 
 #define EPOLLEVENTS 100
-#define MAXSIZE 1024
+#define MAXSIZE 512
 #define LISTENQ 100
 #define FDSIZE 1000
-
-struct epoll_event events[EPOLLEVENTS];
-
+extern struct epoll_event events[EPOLLEVENTS];
 
 int socket_bind(const char* ip, int port);
 void do_epoll(int listenfd);
@@ -19,7 +28,8 @@ void do_write(int epollfd, int fd, char* buf);
 void add_event(int epollfd, int fd, int state);
 void modify_event(int epollfd, int fd, int state);
 void delete_event(int epollfd, int fd, int state);
-int add_user(const char* ip);       //ip vs port
-int del_user(const char* ip);
+void add_user(const char* ip);       //ip vs port
+void del_user(const char* ip);
+int to_number(std::string str);
 
 #endif
