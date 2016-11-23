@@ -99,6 +99,12 @@ public:
 		redisCommand(this->_connect, "HSET %s %s %s", htname.c_str(), key.c_str(), value.c_str());
 	}
 
+	void hdel(std::string htname, std::string key1, std::string key2)
+	{
+		redisCommand(this->_connect, "HDEL %s %s %s", htname.c_str(), key1.c_str(), key2.c_str());
+	}
+
+
 private:
 	redisContext* _connect;
 	redisReply* _reply;

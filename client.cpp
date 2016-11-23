@@ -74,8 +74,9 @@ void do_read(int epollfd, int fd, int sockfd, char *buf) {
 		perror("read error\n");
 		close(fd);
 	} else if (nread == 0) {
-		fprintf(stderr, "server close.\n");
+		fprintf(stderr, "peer close.\n");
 		close(fd);
+		exit(0);
 	} else {
 		if (fd == STDIN_FILENO) {
 			write(sockfd, buf, MAXSIZE);

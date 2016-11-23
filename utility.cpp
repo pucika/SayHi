@@ -68,10 +68,10 @@ void handle_accept(int epollfd, int listenfd){
 		//redis->sadd("user", "");
 		// 如果没有，添加ip至用户表单	以及匹配信息	：user(set)  mapping(ht)ip:fd
 		if (redis->scard("user") == 0)	{
-			char buf[MAXSIZE];
-			memset(buf, 0, MAXSIZE);
-			const char* temp = "matching...";
-			strncpy(buf, temp, MAXSIZE);
+			char buf[13];
+			memset(buf, 0, sizeof(buf));
+			snprintf(buf, 13, "matching...\n");
+			//buf[12] = '\0';
 			write(chifd, buf, strlen(buf));
 			redis->sadd("user", std::to_string(chifd));
 		} else {
@@ -82,10 +82,10 @@ void handle_accept(int epollfd, int listenfd){
 			redis->hset("match", std::to_string(chifd), std::to_string(candi));
 			add_event(epollfd, chifd, EPOLLIN);
 			add_event(epollfd, candi, EPOLLIN);
-			char buf[MAXSIZE];
-			memset(buf, 0, MAXSIZE);
-			const char* temp = "match complete! you can send some words";
-			strncpy(buf, temp, MAXSIZE);
+			char buf[50];
+			memset(buf, 0, sizeof(buf));
+			snprintf(buf, 50, "match complete! you can send some words.\n");
+			//strncpy(buf, temp, MAXSIZE);
 			write(chifd, buf, strlen(buf));
 			write(candi, buf, strlen(buf));
 		}
@@ -99,11 +99,28 @@ void do_read(int epollfd, int fd, char *buf) {
 	nread = read(fd, buf, MAXSIZE);
 	if (nread == -1) {
 		perror("read error: ");
-		close(fd);
-		delete_event(epollfd, fd, EPOLLIN);
+		int fd2 = redis->hget("match", std::to_string(fd));
+		//char buf[] = "peer closed!";
+		//write(fd2, buf, sizeof(buf));
+		if (fd2 == 0)
+			redis->srem("user", std::to_string(fd));
+		else {
+			redis->hdel("match", std::to_string(fd), std::to_string(fd2));
+			close(fd);
+			close(fd2);
+		}
 	} else if (nread == 0) {
 		//关闭描述符
-		close(fd);
+		int fd2 = redis->hget("match", std::to_string(fd));
+		//char buf[] = "peer closed!";
+		//write(fd2, buf, sizeof(buf));
+		if (fd2 == 0)
+			redis->srem("user", std::to_string(fd));
+		else {
+			redis->hdel("match", std::to_string(fd), std::to_string(fd2));
+			close(fd);
+			close(fd2);
+		}
 
 	} else {
 		// got matched fd2
